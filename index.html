@@ -119,6 +119,79 @@
         #enter-vr:hover {
             background: #3a8fd9;
         }
+        .botones-accion {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.btn-accion {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-guardar {
+    background: linear-gradient(135deg, #43e97b, #38f9d7);
+    color: #0f0c29;
+}
+
+.btn-guardar:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(67, 233, 123, 0.4);
+}
+
+.btn-informe {
+    background: linear-gradient(135deg, #4facfe, #00f2fe);
+    color: #0f0c29;
+}
+
+.btn-informe:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(79, 172, 254, 0.4);
+}
+
+#lista-configuraciones {
+    margin-top: 12px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+#lista-configuraciones h4 {
+    margin: 0 0 8px 0;
+    font-size: 13px;
+    color: #a0aec0;
+}
+
+#lista-config {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 11px;
+}
+
+#lista-config li {
+    padding: 5px 8px;
+    margin-bottom: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    color: #e2e8f0;
+    border-left: 3px solid #43e97b;
+}
+
+#lista-config li.vacio {
+    color: #718096;
+    font-style: italic;
+    border-left: 3px solid #4a5568;
+}
     </style>
 </head>
 <body>
@@ -169,25 +242,44 @@
                 <span class="valor" id="masa3-valor">173g</span>
             </div>
         </div>
+        <!-- Botones de acción -->
+<div class="botones-accion">
+    <button id="btn-guardar" class="btn-accion btn-guardar">
+        💾 Guardar Configuración
+    </button>
+    <button id="btn-generar-informe" class="btn-accion btn-informe">
+        📄 Generar Informe
+    </button>
+</div>
+
+<!-- Lista de configuraciones guardadas -->
+<div id="lista-configuraciones">
+    <h4>📋 Configuraciones guardadas</h4>
+    <ul id="lista-config">
+        <li class="vacio">No hay configuraciones guardadas</li>
+    </ul>
+</div>
         <div id="estado">
             <span id="estado-texto">❌ Desequilibrio</span>
         </div>
     </div>
 
     <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-            }
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+            "docx": "https://unpkg.com/docx@8.5.0/build/index.mjs"
         }
-    </script>
+    }
+</script>
 
     <script type="module">
         import * as THREE from 'three';
         import { VRButton } from 'three/addons/webxr/VRButton.js';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+        import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, HeadingLevel, BorderStyle } from 'docx';
 
         // ============================================================
         // CONFIGURACIÓN BÁSICA
@@ -667,7 +759,287 @@ crearEtiqueta('F3', 0, 1.25, -1.2, '#4444ff');
         configurarSlider('masa3', 'masa3-valor', 'masa3', 'g');
 
         actualizarFlechas();
+// ============================================================
+// SISTEMA DE GUARDADO DE CONFIGURACIONES
+// ============================================================
+const configuracionesGuardadas = [];
 
+function guardarConfiguracion() {
+    // Capturar los valores actuales
+    const config = {
+        fecha: new Date().toLocaleString(),
+        angulo1: estado.angulo1,
+        masa1: estado.masa1,
+        angulo2: estado.angulo2,
+        masa2: estado.masa2,
+        angulo3: estado.angulo3,
+        masa3: estado.masa3,
+        resultante: calcularResultante()
+    };
+    
+    // Agregar a la lista
+    configuracionesGuardadas.push(config);
+    
+    // Actualizar la interfaz
+    actualizarListaConfiguraciones();
+    
+    // Feedback visual
+    console.log('✅ Configuración guardada:', config);
+    
+    // Animación de confirmación en el botón
+    const btn = document.getElementById('btn-guardar');
+    if (btn) {
+        btn.textContent = '✅ Guardado';
+        setTimeout(() => {
+            btn.textContent = '💾 Guardar Configuración';
+        }, 1500);
+    }
+}
+
+function calcularResultante() {
+    const v1 = vectorDeFuerza(estado.angulo1, estado.masa1);
+    const v2 = vectorDeFuerza(estado.angulo2, estado.masa2);
+    const v3 = vectorDeFuerza(estado.angulo3, estado.masa3);
+    
+    const rx = v1.x + v2.x + v3.x;
+    const rz = v1.z + v2.z + v3.z;
+    const magnitud = Math.sqrt(rx * rx + rz * rz);
+    
+    return {
+        x: rx,
+        z: rz,
+        magnitud: magnitud,
+        enEquilibrio: magnitud < 0.1
+    };
+}
+
+function actualizarListaConfiguraciones() {
+    const lista = document.getElementById('lista-config');
+    if (!lista) return;
+    
+    if (configuracionesGuardadas.length === 0) {
+        lista.innerHTML = '<li class="vacio">No hay configuraciones guardadas</li>';
+        return;
+    }
+    
+    lista.innerHTML = configuracionesGuardadas.map((config, index) => `
+        <li>
+            <strong>#${index + 1}</strong> - 
+            F1: ${Math.round(config.angulo1)}° / ${Math.round(config.masa1)}g | 
+            F2: ${Math.round(config.angulo2)}° / ${Math.round(config.masa2)}g | 
+            F3: ${Math.round(config.angulo3)}° / ${Math.round(config.masa3)}g
+            ${config.resultante.enEquilibrio ? '✅' : '❌'}
+        </li>
+    `).join('');
+}
+
+// Conectar el botón de guardar
+document.getElementById('btn-guardar').addEventListener('click', guardarConfiguracion);
+// ============================================================
+// GENERAR INFORME EN WORD
+// ============================================================
+async function generarInforme() {
+    if (configuracionesGuardadas.length === 0) {
+        alert('⚠️ No hay configuraciones guardadas. Guarda al menos una antes de generar el informe.');
+        return;
+    }
+
+    // ============================================================
+    // CONSTRUIR EL DOCUMENTO WORD
+    // ============================================================
+    const children = [];
+
+    // Título
+    children.push(
+        new Paragraph({
+            text: 'INFORME DE PRÁCTICA - MESA DE FUERZAS VR',
+            heading: HeadingLevel.HEADING_1,
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 300 }
+        })
+    );
+
+    // Fecha y hora
+    children.push(
+        new Paragraph({
+            children: [
+                new TextRun({ text: 'Fecha: ', bold: true }),
+                new TextRun({ text: new Date().toLocaleString() })
+            ],
+            spacing: { after: 200 }
+        })
+    );
+
+    // Total de configuraciones
+    children.push(
+        new Paragraph({
+            children: [
+                new TextRun({ text: 'Total de configuraciones: ', bold: true }),
+                new TextRun({ text: configuracionesGuardadas.length.toString() })
+            ],
+            spacing: { after: 400 }
+        })
+    );
+
+    // ============================================================
+    // TABLA DE CONFIGURACIONES
+    // ============================================================
+    const filasTabla = [];
+
+    // Encabezados
+    filasTabla.push(
+        new TableRow({
+            children: [
+                new TableCell({ children: [new Paragraph({ text: '#', alignment: AlignmentType.CENTER })], width: { size: 8, type: WidthType.PERCENTAGE } }),
+                new TableCell({ children: [new Paragraph({ text: 'F1 Ángulo', alignment: AlignmentType.CENTER })], width: { size: 13, type: WidthType.PERCENTAGE } }),
+                new TableCell({ children: [new Paragraph({ text: 'F1 Masa', alignment: AlignmentType.CENTER })], width: { size: 13, type: WidthType.PERCENTAGE } }),
+                new TableCell({ children: [new Paragraph({ text: 'F2 Ángulo', alignment: AlignmentType.CENTER })], width: { size: 13, type: WidthType.PERCENTAGE } }),
+                new TableCell({ children: [new Paragraph({ text: 'F2 Masa', alignment: AlignmentType.CENTER })], width: { size: 13, type: WidthType.PERCENTAGE } }),
+                new TableCell({ children: [new Paragraph({ text: 'F3 Ángulo', alignment: AlignmentType.CENTER })], width: { size: 13, type: WidthType.PERCENTAGE } }),
+                new TableCell({ children: [new Paragraph({ text: 'F3 Masa', alignment: AlignmentType.CENTER })], width: { size: 13, type: WidthType.PERCENTAGE } }),
+                new TableCell({ children: [new Paragraph({ text: 'Estado', alignment: AlignmentType.CENTER })], width: { size: 14, type: WidthType.PERCENTAGE } })
+            ]
+        })
+    );
+
+    // Filas de datos
+    configuracionesGuardadas.forEach((config, index) => {
+        filasTabla.push(
+            new TableRow({
+                children: [
+                    new TableCell({ children: [new Paragraph({ text: (index + 1).toString(), alignment: AlignmentType.CENTER })] }),
+                    new TableCell({ children: [new Paragraph({ text: Math.round(config.angulo1) + '°', alignment: AlignmentType.CENTER })] }),
+                    new TableCell({ children: [new Paragraph({ text: Math.round(config.masa1) + 'g', alignment: AlignmentType.CENTER })] }),
+                    new TableCell({ children: [new Paragraph({ text: Math.round(config.angulo2) + '°', alignment: AlignmentType.CENTER })] }),
+                    new TableCell({ children: [new Paragraph({ text: Math.round(config.masa2) + 'g', alignment: AlignmentType.CENTER })] }),
+                    new TableCell({ children: [new Paragraph({ text: Math.round(config.angulo3) + '°', alignment: AlignmentType.CENTER })] }),
+                    new TableCell({ children: [new Paragraph({ text: Math.round(config.masa3) + 'g', alignment: AlignmentType.CENTER })] }),
+                    new TableCell({ children: [new Paragraph({ text: config.resultante.enEquilibrio ? '✅ Equilibrio' : '❌ Desequilibrio', alignment: AlignmentType.CENTER })] })
+                ]
+            })
+        );
+    });
+
+    children.push(
+        new Table({
+            rows: filasTabla,
+            width: { size: 100, type: WidthType.PERCENTAGE }
+        })
+    );
+
+    // Espacio después de la tabla
+    children.push(new Paragraph({ text: '', spacing: { after: 400 } }));
+
+    // ============================================================
+    // DETALLE DE CADA CONFIGURACIÓN
+    // ============================================================
+    children.push(
+        new Paragraph({
+            text: 'DETALLE DE CADA CONFIGURACIÓN',
+            heading: HeadingLevel.HEADING_2,
+            spacing: { after: 200 }
+        })
+    );
+
+    configuracionesGuardadas.forEach((config, index) => {
+        children.push(
+            new Paragraph({
+                text: `Configuración #${index + 1}`,
+                heading: HeadingLevel.HEADING_3,
+                spacing: { before: 200, after: 100 }
+            })
+        );
+
+        children.push(
+            new Paragraph({
+                children: [
+                    new TextRun({ text: 'F1: ', bold: true, color: 'FF4444' }),
+                    new TextRun({ text: `Ángulo = ${Math.round(config.angulo1)}°, Masa = ${Math.round(config.masa1)}g` })
+                ]
+            })
+        );
+        children.push(
+            new Paragraph({
+                children: [
+                    new TextRun({ text: 'F2: ', bold: true, color: '44FF44' }),
+                    new TextRun({ text: `Ángulo = ${Math.round(config.angulo2)}°, Masa = ${Math.round(config.masa2)}g` })
+                ]
+            })
+        );
+        children.push(
+            new Paragraph({
+                children: [
+                    new TextRun({ text: 'F3: ', bold: true, color: '4444FF' }),
+                    new TextRun({ text: `Ángulo = ${Math.round(config.angulo3)}°, Masa = ${Math.round(config.masa3)}g` })
+                ]
+            })
+        );
+        children.push(
+            new Paragraph({
+                children: [
+                    new TextRun({ text: 'Resultante: ', bold: true }),
+                    new TextRun({ text: `${config.resultante.magnitud.toFixed(3)} N` })
+                ]
+            })
+        );
+        children.push(
+            new Paragraph({
+                children: [
+                    new TextRun({ text: 'Estado: ', bold: true }),
+                    new TextRun({ 
+                        text: config.resultante.enEquilibrio ? '✅ EQUILIBRIO' : '❌ DESEQUILIBRIO',
+                        color: config.resultante.enEquilibrio ? '008000' : 'FF0000',
+                        bold: true
+                    })
+                ],
+                spacing: { after: 200 }
+            })
+        );
+    });
+
+    // ============================================================
+    // CREAR EL DOCUMENTO
+    // ============================================================
+    const doc = new Document({
+        sections: [{
+            children: children
+        }]
+    });
+
+    // ============================================================
+    // GENERAR EL ARCHIVO Y DESCARGARLO
+    // ============================================================
+    try {
+        const blob = await Packer.toBlob(doc);
+        
+        // Descargar el archivo
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Informe_MesaFuerzas_${new Date().toISOString().slice(0, 10)}.docx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        console.log('✅ Informe generado correctamente');
+        
+        // Feedback visual
+        const btn = document.getElementById('btn-generar-informe');
+        if (btn) {
+            btn.textContent = '✅ Informe Generado';
+            setTimeout(() => {
+                btn.textContent = '📄 Generar Informe';
+            }, 2000);
+        }
+    } catch (error) {
+        console.error('❌ Error al generar el informe:', error);
+        alert('Error al generar el informe: ' + error.message);
+    }
+}
+
+// Conectar el botón de generar informe
+document.getElementById('btn-generar-informe').addEventListener('click', generarInforme);
         // ============================================================
         // ANIMACIÓN
         // ============================================================
