@@ -606,6 +606,94 @@ function crearEtiqueta(texto, posX, posY, posZ, color) {
 crearEtiqueta('F1', 0, 2.05, -1.2, '#ff4444');
 crearEtiqueta('F2', 0, 1.65, -1.2, '#44ff44');
 crearEtiqueta('F3', 0, 1.25, -1.2, '#4444ff');
+// ============================================================
+// FUNCIÓN PARA CREAR BOTONES 3D
+// ============================================================
+function crearBoton3D(texto, posX, posY, posZ, colorFondo, colorTexto, accion) {
+    const botonGroup = new THREE.Group();
+    
+    // ============================================================
+    // PLACA DEL BOTÓN (caja alargada)
+    // ============================================================
+    const placaGeometry = new THREE.BoxGeometry(0.4, 0.12, 0.02);
+    const placaMaterial = new THREE.MeshStandardMaterial({ 
+        color: colorFondo,
+        emissive: colorFondo,
+        emissiveIntensity: 0.2
+    });
+    const placa = new THREE.Mesh(placaGeometry, placaMaterial);
+    botonGroup.add(placa);
+    
+    // ============================================================
+    // TEXTO DEL BOTÓN
+    // ============================================================
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    
+    ctx.fillStyle = 'rgba(0, 0, 0, 0)';
+    ctx.fillRect(0, 0, 512, 128);
+    
+    ctx.fillStyle = colorTexto;
+    ctx.font = 'bold 48px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(texto, 256, 64);
+    
+    const textura = new THREE.CanvasTexture(canvas);
+    const textoMaterial = new THREE.MeshBasicMaterial({ 
+        map: textura,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    const textoGeometry = new THREE.PlaneGeometry(0.38, 0.1);
+    const texto3D = new THREE.Mesh(textoGeometry, textoMaterial);
+    texto3D.position.set(0, 0, 0.011);
+    botonGroup.add(texto3D);
+    
+    // ============================================================
+    // GUARDAR DATOS DEL BOTÓN
+    // ============================================================
+    botonGroup.userData = {
+        esBoton: true,
+        accion: accion,
+        colorOriginal: colorFondo,
+        placa: placa,
+        texto: texto3D
+    };
+    
+    botonGroup.position.set(posX, posY, posZ);
+    scene.add(botonGroup);
+    
+    return botonGroup;
+}
+
+// ============================================================
+// CREAR LOS BOTONES 3D EN EL PLANO XZ (HORIZONTAL)
+// ============================================================
+// Estos botones están en el plano XZ (horizontal), a la derecha
+// del usuario y a una altura accesible.
+
+// Botón Guardar Configuración (verde)
+const botonGuardar3D = crearBoton3D(
+    'GUARDAR', 
+    0.8, 0.9, -0.8,    // Posición: derecha, altura media, al frente
+    0x43e97b,           // Color fondo: verde
+    '#0f0c29',          // Color texto: oscuro
+    'guardar'           // Acción
+);
+botonGuardar3D.rotation.x = -Math.PI / 2; // Acostado (horizontal)
+
+// Botón Generar Informe (azul)
+const botonInforme3D = crearBoton3D(
+    'INFORME', 
+    0.8, 0.9, -1.3,    // Posición: derecha, misma altura, más al frente
+    0x4facfe,           // Color fondo: azul
+    '#0f0c29',          // Color texto: oscuro
+    'informe'           // Acción
+);
+botonInforme3D.rotation.x = -Math.PI / 2; // Acostado (horizontal)
         // ============================================================
         // CONFIGURACIÓN DE VR
         // ============================================================
@@ -646,25 +734,58 @@ crearEtiqueta('F3', 0, 1.25, -1.2, '#4444ff');
         const tempMatrix = new THREE.Matrix4();
 
         function onSelectStart(event) {
-            const controller = event.target;
-            
-            tempMatrix.identity().extractRotation(controller.matrixWorld);
-            raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
-            raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
-            
-            const intersects = raycaster.intersectObjects(sliders3D, true);
-            
-            if (intersects.length > 0) {
-                let sliderHit = intersects[0].object;
-                while (sliderHit.parent && !sliderHit.userData.nombre) {
-                    sliderHit = sliderHit.parent;
-                }
-                if (sliderHit.userData && sliderHit.userData.nombre) {
-                    controller.userData.sliderAgarrado = sliderHit;
-                    console.log('Slider agarrado:', sliderHit.userData.nombre);
-                }
-            }
+    const controller = event.target;
+    
+    tempMatrix.identity().extractRotation(controller.matrixWorld);
+    raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+    raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+    
+    // ============================================================
+    // 1. DETECTAR SLIDERS
+    // ============================================================
+    const intersectsSliders = raycaster.intersectObjects(sliders3D, true);
+    
+    if (intersectsSliders.length > 0) {
+        let sliderHit = intersectsSliders[0].object;
+        while (sliderHit.parent && !sliderHit.userData.nombre) {
+            sliderHit = sliderHit.parent;
         }
+        if (sliderHit.userData && sliderHit.userData.nombre) {
+            controller.userData.sliderAgarrado = sliderHit;
+            console.log('Slider agarrado:', sliderHit.userData.nombre);
+            return;
+        }
+    }
+    
+    // ============================================================
+    // 2. DETECTAR BOTONES 3D
+    // ============================================================
+    const intersectsBotones = raycaster.intersectObjects([botonGuardar3D, botonInforme3D], true);
+    
+    if (intersectsBotones.length > 0) {
+        let botonHit = intersectsBotones[0].object;
+        while (botonHit.parent && !botonHit.userData.esBoton) {
+            botonHit = botonHit.parent;
+        }
+        if (botonHit.userData && botonHit.userData.esBoton) {
+            console.log('Botón presionado:', botonHit.userData.accion);
+            
+            // Ejecutar la acción correspondiente
+            if (botonHit.userData.accion === 'guardar') {
+                guardarConfiguracion();
+            } else if (botonHit.userData.accion === 'informe') {
+                generarInforme();
+            }
+            
+            // Feedback visual (cambiar color brevemente)
+            const colorOriginal = botonHit.userData.colorOriginal;
+            botonHit.userData.placa.material.color.setHex(0xffffff);
+            setTimeout(() => {
+                botonHit.userData.placa.material.color.setHex(colorOriginal);
+            }, 300);
+        }
+    }
+}
 
         function onSelectEnd(event) {
             const controller = event.target;
