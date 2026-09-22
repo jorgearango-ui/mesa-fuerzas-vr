@@ -388,7 +388,7 @@ const mesa = new THREE.Mesh(mesaGeometry, [
     materialTapaSuperior,
     materialTapaInferior
 ]);
-mesa.position.y = 0;
+mesa.position.y = 0.8;
 
 // 3. ROTAR LA MESA 90° para alinear las marcas con las flechas
 mesa.rotation.y =-Math.PI / 2;
@@ -419,7 +419,7 @@ scene.add(mesa);
             punta.position.x = 1.1;
             flechaGroup.add(punta);
             
-            flechaGroup.position.set(0, 0.15, 0);
+            flechaGroup.position.set(0, 0.85, 0);
             flechaGroup.rotation.y = [30, 330, 180][i] * Math.PI / 180;
             
             scene.add(flechaGroup);
@@ -432,7 +432,7 @@ scene.add(mesa);
         const burbujaGeometry = new THREE.SphereGeometry(0.15, 32, 32);
         const burbujaMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
         const burbuja = new THREE.Mesh(burbujaGeometry, burbujaMaterial);
-        burbuja.position.set(0, 0.3, 0);
+        burbuja.position.set(0, 1.0, 0);
         scene.add(burbuja);
 
         // ============================================================
@@ -454,6 +454,35 @@ scene.add(mesa);
         const controllerGrip2 = renderer.xr.getControllerGrip(1);
         controllerGrip2.add(controllerModelFactory.createControllerModel(controllerGrip2));
         scene.add(controllerGrip2);
+// ============================================================
+// Rayo láser visible desde los controladores
+// ============================================================
+const raycaster = new THREE.Raycaster();
+const tempMatrix = new THREE.Matrix4();
+
+function onSelectStart(event) {
+    const controller = event.target;
+    const line = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(0, 0, 0),
+            new THREE.Vector3(0, 0, -5)
+        ]),
+        new THREE.LineBasicMaterial({ color: 0x00ffff })
+    );
+    controller.add(line);
+}
+
+function onSelectEnd(event) {
+    const controller = event.target;
+    controller.children.forEach(child => {
+        if (child.isLine) controller.remove(child);
+    });
+}
+
+controller1.addEventListener('selectstart', onSelectStart);
+controller1.addEventListener('selectend', onSelectEnd);
+controller2.addEventListener('selectstart', onSelectStart);
+controller2.addEventListener('selectend', onSelectEnd);
 // ============================================================
 // LÓGICA DE FUERZAS
 // ============================================================
