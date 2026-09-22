@@ -388,48 +388,79 @@
         // ============================================================
         const sliders3D = [];
 
-        function crearSlider3D(posX, posY, posZ, nombre, min, max, valorInicial, color) {
-            const sliderGroup = new THREE.Group();
-            
-            const rielGeometry = new THREE.BoxGeometry(0.4, 0.02, 0.02);
-            const rielMaterial = new THREE.MeshStandardMaterial({ color: 0x444444 });
-            const riel = new THREE.Mesh(rielGeometry, rielMaterial);
-            sliderGroup.add(riel);
-            
-            const perillaGeometry = new THREE.SphereGeometry(0.025, 16, 16);
-            const perillaMaterial = new THREE.MeshStandardMaterial({ color: color });
-            const perilla = new THREE.Mesh(perillaGeometry, perillaMaterial);
-            
-            const rango = max - min;
-            const porcentaje = (valorInicial - min) / rango;
-            const posPerillaX = (porcentaje - 0.5) * 0.4;
-            
-            perilla.position.set(posPerillaX, 0, 0);
-            sliderGroup.add(perilla);
-            
-            sliderGroup.userData = {
-                nombre: nombre,
-                min: min,
-                max: max,
-                valor: valorInicial,
-                perilla: perilla,
-                color: color
-            };
-            
-            sliderGroup.position.set(posX, posY, posZ);
-            scene.add(sliderGroup);
-            sliders3D.push(sliderGroup);
-            
-            return sliderGroup;
-        }
-
-        crearSlider3D(-0.5, 1.3, -1.0, 'angulo1', 0, 360, 30, 0xff4444);
-        crearSlider3D(-0.5, 1.2, -1.0, 'masa1', 0, 500, 100, 0xff8888);
-        crearSlider3D(0, 1.3, -1.0, 'angulo2', 0, 360, 330, 0x44ff44);
-        crearSlider3D(0, 1.2, -1.0, 'masa2', 0, 500, 100, 0x88ff88);
-        crearSlider3D(0.5, 1.3, -1.0, 'angulo3', 0, 360, 180, 0x4444ff);
-        crearSlider3D(0.5, 1.2, -1.0, 'masa3', 0, 500, 173, 0x8888ff);
-
+       function crearSlider3D(posX, posY, posZ, nombre, min, max, valorInicial, color) {
+    const sliderGroup = new THREE.Group();
+    
+    // Riel del slider
+    const rielGeometry = new THREE.BoxGeometry(0.6, 0.02, 0.02);
+    const rielMaterial = new THREE.MeshStandardMaterial({ color: 0x444444 });
+    const riel = new THREE.Mesh(rielGeometry, rielMaterial);
+    sliderGroup.add(riel);
+    
+    // Perilla del slider
+    const perillaGeometry = new THREE.SphereGeometry(0.035, 16, 16);
+    const perillaMaterial = new THREE.MeshStandardMaterial({ color: color });
+    const perilla = new THREE.Mesh(perillaGeometry, perillaMaterial);
+    
+    const rango = max - min;
+    const porcentaje = (valorInicial - min) / rango;
+    const posPerillaX = (porcentaje - 0.5) * 0.6;
+    
+    perilla.position.set(posPerillaX, 0, 0);
+    sliderGroup.add(perilla);
+    
+    // ============================================================
+    // TEXTO 3D CON EL VALOR
+    // ============================================================
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, 256, 64);
+    
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 40px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    // Determinar la unidad según el nombre
+    const unidad = nombre.startsWith('angulo') ? '°' : 'g';
+    ctx.fillText(valorInicial + unidad, 128, 32);
+    
+    const textura = new THREE.CanvasTexture(canvas);
+    const textoMaterial = new THREE.MeshBasicMaterial({ 
+        map: textura,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    const textoGeometry = new THREE.PlaneGeometry(0.25, 0.06);
+    const texto3D = new THREE.Mesh(textoGeometry, textoMaterial);
+    texto3D.position.set(0, 0.08, 0);
+    sliderGroup.add(texto3D);
+    
+    // Guardar datos
+    sliderGroup.userData = {
+        nombre: nombre,
+        min: min,
+        max: max,
+        valor: valorInicial,
+        perilla: perilla,
+        color: color,
+        canvas: canvas,
+        ctx: ctx,
+        textura: textura,
+        texto3D: texto3D,
+        unidad: unidad
+    };
+    
+    sliderGroup.position.set(posX, posY, posZ);
+    scene.add(sliderGroup);
+    sliders3D.push(sliderGroup);
+    
+    return sliderGroup;
+}
         // ============================================================
         // CONFIGURACIÓN DE VR
         // ============================================================
@@ -598,13 +629,31 @@
                     slider.worldToLocal(posControlador);
                     
                     const rango = slider.userData.max - slider.userData.min;
-                    let porcentaje = (posControlador.x / 0.4) + 0.5;
+                    let porcentaje = (posControlador.x / 0.6) + 0.5;
                     porcentaje = Math.max(0, Math.min(1, porcentaje));
                     
                     const nuevoValor = slider.userData.min + porcentaje * rango;
                     slider.userData.valor = nuevoValor;
-                    slider.userData.perilla.position.x = (porcentaje - 0.5) * 0.4;
-                    
+                    slider.userData.perilla.position.x = (porcentaje - 0.5) * 0.6;
+                    // Actualizar el texto del slider
+                    if (slider.userData.ctx && slider.userData.textura) {
+                    const ctx = slider.userData.ctx;
+                    const unidad = slider.userData.unidad || '';
+    
+                    // Limpiar el canvas
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    ctx.fillRect(0, 0, 256, 64);
+    
+                    // Dibujar el nuevo valor
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 40px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(Math.round(nuevoValor) + unidad, 128, 32);
+    
+                    // Actualizar la textura
+                    slider.userData.textura.needsUpdate = true;
+                    }                    
                     const nombre = slider.userData.nombre;
                     if (nombre === 'angulo1') estado.angulo1 = nuevoValor;
                     if (nombre === 'masa1') estado.masa1 = nuevoValor;
